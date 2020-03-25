@@ -27,8 +27,8 @@ using namespace OpenRCT2;
 
 // Globals for paint clipping
 uint8_t gClipHeight = 128; // Default to middle value
-LocationXY8 gClipSelectionA = { 0, 0 };
-LocationXY8 gClipSelectionB = { MAXIMUM_MAP_SIZE_TECHNICAL - 1, MAXIMUM_MAP_SIZE_TECHNICAL - 1 };
+CoordsXY gClipSelectionA = { 0, 0 };
+CoordsXY gClipSelectionB = { MAXIMUM_TILE_START_XY, MAXIMUM_TILE_START_XY };
 
 static constexpr const uint8_t BoundBoxDebugColours[] = {
     0,   // NONE
@@ -71,8 +71,7 @@ static void paint_session_add_ps_to_quadrant(paint_session* session, paint_struc
  * Extracted from 0x0098196c, 0x0098197c, 0x0098198c, 0x0098199c
  */
 static paint_struct* sub_9819_c(
-    paint_session* session, uint32_t image_id, const CoordsXYZ& offset, LocationXYZ16 boundBoxSize,
-    LocationXYZ16 boundBoxOffset)
+    paint_session* session, uint32_t image_id, const CoordsXYZ& offset, CoordsXYZ boundBoxSize, CoordsXYZ boundBoxOffset)
 {
     if (session->NextFreePaintStruct >= session->EndOfPaintStructArray)
         return nullptr;
@@ -119,22 +118,22 @@ static paint_struct* sub_9819_c(
         case 0:
             boundBoxSize.x--;
             boundBoxSize.y--;
-            rotate_map_coordinates(&boundBoxOffset.x, &boundBoxOffset.y, 0);
-            rotate_map_coordinates(&boundBoxSize.x, &boundBoxSize.y, 0);
+            boundBoxOffset = { boundBoxOffset.Rotate(0), boundBoxOffset.z };
+            boundBoxSize = { boundBoxSize.Rotate(0), boundBoxSize.z };
             break;
         case 1:
             boundBoxSize.x--;
-            rotate_map_coordinates(&boundBoxOffset.x, &boundBoxOffset.y, 3);
-            rotate_map_coordinates(&boundBoxSize.x, &boundBoxSize.y, 3);
+            boundBoxOffset = { boundBoxOffset.Rotate(3), boundBoxOffset.z };
+            boundBoxSize = { boundBoxSize.Rotate(3), boundBoxSize.z };
             break;
         case 2:
-            rotate_map_coordinates(&boundBoxSize.x, &boundBoxSize.y, 2);
-            rotate_map_coordinates(&boundBoxOffset.x, &boundBoxOffset.y, 2);
+            boundBoxSize = { boundBoxSize.Rotate(2), boundBoxSize.z };
+            boundBoxOffset = { boundBoxOffset.Rotate(2), boundBoxOffset.z };
             break;
         case 3:
             boundBoxSize.y--;
-            rotate_map_coordinates(&boundBoxSize.x, &boundBoxSize.y, 1);
-            rotate_map_coordinates(&boundBoxOffset.x, &boundBoxOffset.y, 1);
+            boundBoxSize = { boundBoxSize.Rotate(1), boundBoxSize.z };
+            boundBoxOffset = { boundBoxOffset.Rotate(1), boundBoxOffset.z };
             break;
     }
 
@@ -400,7 +399,7 @@ static paint_struct* paint_arrange_structs_helper_rotation(paint_struct* ps_next
     }
 }
 
-paint_struct* paint_arrange_structs_helper(paint_struct* ps_next, uint16_t quadrantIndex, uint8_t flag, uint8_t rotation)
+static paint_struct* paint_arrange_structs_helper(paint_struct* ps_next, uint16_t quadrantIndex, uint8_t flag, uint8_t rotation)
 {
     switch (rotation)
     {
@@ -689,16 +688,6 @@ static uint32_t paint_ps_colourify_image(uint32_t imageId, uint8_t spriteType, u
     return imageId;
 }
 
-static void draw_pixel_info_crop_by_zoom(rct_drawpixelinfo* dpi)
-{
-    int32_t zoom = dpi->zoom_level;
-    dpi->zoom_level = 0;
-    dpi->x >>= zoom;
-    dpi->y >>= zoom;
-    dpi->width >>= zoom;
-    dpi->height >>= zoom;
-}
-
 paint_session* paint_session_alloc(rct_drawpixelinfo* dpi, uint32_t viewFlags)
 {
     return GetContext()->GetPainter()->CreateSession(dpi, viewFlags);
@@ -751,7 +740,7 @@ paint_struct* sub_98196C(
         z_offset,
     };
 
-    LocationXYZ16 boundBox = {
+    CoordsXYZ boundBox = {
         bound_box_length_x, // di
         bound_box_length_y, // si
         bound_box_length_z,
@@ -764,26 +753,26 @@ paint_struct* sub_98196C(
 
             boundBox.x--;
             boundBox.y--;
-            rotate_map_coordinates(&boundBox.x, &boundBox.y, TILE_ELEMENT_DIRECTION_WEST);
+            boundBox = { boundBox.Rotate(TILE_ELEMENT_DIRECTION_WEST), boundBox.z };
             break;
 
         case 1:
             coord_3d = CoordsXYZ{ coord_3d.Rotate(TILE_ELEMENT_DIRECTION_SOUTH), coord_3d.z };
 
             boundBox.x--;
-            rotate_map_coordinates(&boundBox.x, &boundBox.y, TILE_ELEMENT_DIRECTION_SOUTH);
+            boundBox = { boundBox.Rotate(TILE_ELEMENT_DIRECTION_SOUTH), boundBox.z };
             break;
 
         case 2:
             coord_3d = CoordsXYZ{ coord_3d.Rotate(TILE_ELEMENT_DIRECTION_EAST), coord_3d.z };
-            rotate_map_coordinates(&boundBox.x, &boundBox.y, TILE_ELEMENT_DIRECTION_EAST);
+            boundBox = { boundBox.Rotate(TILE_ELEMENT_DIRECTION_EAST), boundBox.z };
             break;
 
         case 3:
             coord_3d = CoordsXYZ{ coord_3d.Rotate(TILE_ELEMENT_DIRECTION_NORTH), coord_3d.z };
 
             boundBox.y--;
-            rotate_map_coordinates(&boundBox.x, &boundBox.y, TILE_ELEMENT_DIRECTION_NORTH);
+            boundBox = { boundBox.Rotate(TILE_ELEMENT_DIRECTION_NORTH), boundBox.z };
             break;
     }
 
@@ -880,8 +869,8 @@ paint_struct* sub_98197C(
     session->UnkF1AD2C = nullptr;
 
     CoordsXYZ offset = { x_offset, y_offset, z_offset };
-    LocationXYZ16 boundBoxSize = { bound_box_length_x, bound_box_length_y, bound_box_length_z };
-    LocationXYZ16 boundBoxOffset = { bound_box_offset_x, bound_box_offset_y, bound_box_offset_z };
+    CoordsXYZ boundBoxSize = { bound_box_length_x, bound_box_length_y, bound_box_length_z };
+    CoordsXYZ boundBoxOffset = { bound_box_offset_x, bound_box_offset_y, bound_box_offset_z };
     paint_struct* ps = sub_9819_c(session, image_id, offset, boundBoxSize, boundBoxOffset);
 
     if (ps == nullptr)
@@ -891,9 +880,7 @@ paint_struct* sub_98197C(
 
     session->LastRootPS = ps;
 
-    LocationXY16 attach = { (int16_t)ps->bounds.x, (int16_t)ps->bounds.y };
-
-    rotate_map_coordinates(&attach.x, &attach.y, session->CurrentRotation);
+    auto attach = CoordsXY{ (int16_t)ps->bounds.x, (int16_t)ps->bounds.y }.Rotate(session->CurrentRotation);
     switch (session->CurrentRotation)
     {
         case 0:
@@ -942,8 +929,8 @@ paint_struct* sub_98198C(
     session->UnkF1AD2C = nullptr;
 
     CoordsXYZ offset = { x_offset, y_offset, z_offset };
-    LocationXYZ16 boundBoxSize = { bound_box_length_x, bound_box_length_y, bound_box_length_z };
-    LocationXYZ16 boundBoxOffset = { bound_box_offset_x, bound_box_offset_y, bound_box_offset_z };
+    CoordsXYZ boundBoxSize = { bound_box_length_x, bound_box_length_y, bound_box_length_z };
+    CoordsXYZ boundBoxOffset = { bound_box_offset_x, bound_box_offset_y, bound_box_offset_z };
     paint_struct* ps = sub_9819_c(session, image_id, offset, boundBoxSize, boundBoxOffset);
 
     if (ps == nullptr)
@@ -988,8 +975,8 @@ paint_struct* sub_98199C(
     }
 
     CoordsXYZ offset = { x_offset, y_offset, z_offset };
-    LocationXYZ16 boundBox = { bound_box_length_x, bound_box_length_y, bound_box_length_z };
-    LocationXYZ16 boundBoxOffset = { bound_box_offset_x, bound_box_offset_y, bound_box_offset_z };
+    CoordsXYZ boundBox = { bound_box_length_x, bound_box_length_y, bound_box_length_z };
+    CoordsXYZ boundBoxOffset = { bound_box_offset_x, bound_box_offset_y, bound_box_offset_z };
     paint_struct* ps = sub_9819_c(session, image_id, offset, boundBox, boundBoxOffset);
 
     if (ps == nullptr)
@@ -1132,24 +1119,33 @@ void paint_floating_money_effect(
     session->LastPSString = ps;
 }
 
+static rct_drawpixelinfo draw_pixel_info_crop_by_zoom(const rct_drawpixelinfo& dpi)
+{
+    auto result = dpi;
+    result.x = dpi.x * dpi.zoom_level;
+    result.y = dpi.y * dpi.zoom_level;
+    result.width = dpi.width / dpi.zoom_level;
+    result.height = dpi.height / dpi.zoom_level;
+    result.zoom_level = 0;
+    return result;
+}
+
 /**
  *
  *  rct2: 0x006860C3
  */
 void paint_draw_money_structs(rct_drawpixelinfo* dpi, paint_string_struct* ps)
 {
-    rct_drawpixelinfo dpi2 = *dpi;
-    draw_pixel_info_crop_by_zoom(&dpi2);
-
+    auto dpi2 = draw_pixel_info_crop_by_zoom(*dpi);
     do
     {
-        utf8 buffer[256];
-        format_string(buffer, 256, ps->string_id, &ps->args);
+        char buffer[256]{};
+        format_string(buffer, sizeof(buffer), ps->string_id, &ps->args);
         gCurrentFontSpriteBase = FONT_SPRITE_BASE_MEDIUM;
 
         // Use sprite font unless the currency contains characters unsupported by the sprite font
-        bool forceSpriteFont = false;
-        const currency_descriptor& currencyDesc = CurrencyDescriptors[gConfigGeneral.currency_format];
+        auto forceSpriteFont = false;
+        const auto& currencyDesc = CurrencyDescriptors[gConfigGeneral.currency_format];
         if (LocalisationService_UseTrueTypeFont() && font_supports_string_sprite(currencyDesc.symbol_unicode))
         {
             forceSpriteFont = true;

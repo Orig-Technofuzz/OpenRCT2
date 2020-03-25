@@ -23,7 +23,7 @@ private:
 public:
     MazePlaceTrackAction() = default;
 
-    MazePlaceTrackAction(CoordsXYZ location, NetworkRideId_t rideIndex, uint16_t mazeEntry)
+    MazePlaceTrackAction(const CoordsXYZ& location, NetworkRideId_t rideIndex, uint16_t mazeEntry)
         : _loc(location)
         , _rideIndex(rideIndex)
         , _mazeEntry(mazeEntry)
@@ -40,10 +40,8 @@ public:
     {
         auto res = std::make_unique<GameActionResult>();
 
-        res->Position.x = _loc.x + 8;
-        res->Position.y = _loc.y + 8;
-        res->Position.z = _loc.z;
-        res->ExpenditureType = RCT_EXPENDITURE_TYPE_RIDE_CONSTRUCTION;
+        res->Position = _loc + CoordsXYZ{ 8, 8, 0 };
+        res->Expenditure = ExpenditureType::RideConstruction;
         res->ErrorTitle = STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE;
         if (!map_check_free_elements_and_reorganise(1))
         {
@@ -73,13 +71,13 @@ public:
             return res;
         }
 
-        uint8_t baseHeight = _loc.z / 8;
-        uint8_t clearanceHeight = (_loc.z + 32) / 8;
+        auto baseHeight = _loc.z;
+        auto clearanceHeight = _loc.z + MAZE_CLEARANCE_HEIGHT;
 
-        int8_t heightDifference = baseHeight - surfaceElement->base_height;
+        auto heightDifference = baseHeight - surfaceElement->GetBaseZ();
         if (heightDifference >= 0 && !gCheatsDisableSupportLimits)
         {
-            heightDifference = heightDifference >> 1;
+            heightDifference /= COORDS_Z_PER_TINY_Z;
 
             if (heightDifference > RideData5[RIDE_TYPE_MAZE].max_height)
             {
@@ -92,8 +90,8 @@ public:
         money32 clearCost = 0;
 
         if (!map_can_construct_with_clear_at(
-                floor2(_loc.x, 32), floor2(_loc.y, 32), baseHeight, clearanceHeight, &map_place_non_scenery_clear_func,
-                { 0b1111, 0 }, GetFlags(), &clearCost, CREATE_CROSSING_MODE_NONE))
+                { _loc.ToTileStart(), baseHeight, clearanceHeight }, &map_place_non_scenery_clear_func, { 0b1111, 0 },
+                GetFlags(), &clearCost, CREATE_CROSSING_MODE_NONE))
         {
             return MakeResult(GA_ERROR::NO_CLEARANCE, res->ErrorTitle, gGameCommandErrorText, gCommonFormatArgs);
         }
@@ -130,10 +128,8 @@ public:
     {
         auto res = std::make_unique<GameActionResult>();
 
-        res->Position.x = _loc.x + 8;
-        res->Position.y = _loc.y + 8;
-        res->Position.z = _loc.z;
-        res->ExpenditureType = RCT_EXPENDITURE_TYPE_RIDE_CONSTRUCTION;
+        res->Position = _loc + CoordsXYZ{ 8, 8, 0 };
+        res->Expenditure = ExpenditureType::RideConstruction;
         res->ErrorTitle = STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE;
 
         auto ride = get_ride(_rideIndex);
@@ -154,17 +150,17 @@ public:
         uint32_t flags = GetFlags();
         if (!(flags & GAME_COMMAND_FLAG_GHOST))
         {
-            footpath_remove_litter(_loc.x, _loc.y, _loc.z);
-            wall_remove_at(floor2(_loc.x, 32), floor2(_loc.y, 32), _loc.z, _loc.z + 32);
+            footpath_remove_litter(_loc);
+            wall_remove_at({ _loc.ToTileStart(), _loc.z, _loc.z + 32 });
         }
 
-        uint8_t baseHeight = _loc.z / 8;
-        uint8_t clearanceHeight = (_loc.z + 32) / 8;
+        auto baseHeight = _loc.z;
+        auto clearanceHeight = _loc.z + MAZE_CLEARANCE_HEIGHT;
 
         money32 clearCost = 0;
         if (!map_can_construct_with_clear_at(
-                floor2(_loc.x, 32), floor2(_loc.y, 32), baseHeight, clearanceHeight, &map_place_non_scenery_clear_func,
-                { 0b1111, 0 }, GetFlags() | GAME_COMMAND_FLAG_APPLY, &clearCost, CREATE_CROSSING_MODE_NONE))
+                { _loc.ToTileStart(), baseHeight, clearanceHeight }, &map_place_non_scenery_clear_func, { 0b1111, 0 },
+                GetFlags() | GAME_COMMAND_FLAG_APPLY, &clearCost, CREATE_CROSSING_MODE_NONE))
         {
             return MakeResult(GA_ERROR::NO_CLEARANCE, res->ErrorTitle, gGameCommandErrorText, gCommonFormatArgs);
         }
@@ -172,13 +168,12 @@ public:
         money32 price = (((RideTrackCosts[ride->type].track_price * TrackPricing[TRACK_ELEM_MAZE]) >> 16));
         res->Cost = clearCost + price / 2 * 10;
 
-        uint16_t flooredX = floor2(_loc.x, 32);
-        uint16_t flooredY = floor2(_loc.y, 32);
+        auto startLoc = _loc.ToTileStart();
 
-        auto tileElement = tile_element_insert({ _loc.x / 32, _loc.y / 32, baseHeight }, 0b1111);
+        auto tileElement = tile_element_insert(_loc, 0b1111);
         assert(tileElement != nullptr);
 
-        tileElement->clearance_height = clearanceHeight + 4;
+        tileElement->SetClearanceZ(clearanceHeight + MAZE_CLEARANCE_HEIGHT);
         tileElement->SetType(TILE_ELEMENT_TYPE_TRACK);
 
         tileElement->AsTrack()->SetTrackType(TRACK_ELEM_MAZE);
@@ -190,16 +185,15 @@ public:
             tileElement->SetGhost(true);
         }
 
-        map_invalidate_tile_full(flooredX, flooredY);
+        map_invalidate_tile_full(startLoc);
 
         ride->maze_tiles++;
-        ride->stations[0].Height = tileElement->base_height;
-        ride->stations[0].Start.xy = 0;
+        ride->stations[0].SetBaseZ(tileElement->GetBaseZ());
+        ride->stations[0].Start = { 0, 0 };
 
         if (ride->maze_tiles == 1)
         {
-            ride->overall_view.x = flooredX / 32;
-            ride->overall_view.y = flooredY / 32;
+            ride->overall_view = startLoc;
         }
 
         return res;

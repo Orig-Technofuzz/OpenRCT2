@@ -45,8 +45,8 @@ static void window_shortcut_resize(rct_window *w);
 static void window_shortcut_invalidate(rct_window *w);
 static void window_shortcut_paint(rct_window *w, rct_drawpixelinfo *dpi);
 static void window_shortcut_scrollgetsize(rct_window *w, int32_t scrollIndex, int32_t *width, int32_t *height);
-static void window_shortcut_scrollmousedown(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
-static void window_shortcut_scrollmouseover(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
+static void window_shortcut_scrollmousedown(rct_window *w, int32_t scrollIndex, const ScreenCoordsXY& screenCoords);
+static void window_shortcut_scrollmouseover(rct_window *w, int32_t scrollIndex, const ScreenCoordsXY& screenCoords);
 static void window_shortcut_scrollpaint(rct_window *w, rct_drawpixelinfo *dpi, int32_t scrollIndex);
 
 static rct_window_event_list window_shortcut_events = {
@@ -151,6 +151,20 @@ const rct_string_id ShortcutStringIds[SHORTCUT_COUNT] = {
     STR_SHORTCUT_OPEN_TILE_INSPECTOR,
     STR_ADVANCE_TO_NEXT_TICK,
     STR_SHORTCUT_OPEN_SCENERY_PICKER,
+    STR_SHORTCUT_SCALE_UP,
+    STR_SHORTCUT_SCALE_DOWN,
+    STR_SHORTCUT_INSERT_CORRPUT_ELEMENT,
+    STR_SHORTCUT_COPY_ELEMENT,
+    STR_SHORTCUT_PASTE_ELEMENT,
+    STR_SHORTCUT_REMOVE_ELEMENT,
+    STR_SHORTCUT_MOVE_ELEMENT_UP,
+    STR_SHORTCUT_MOVE_ELEMENT_DOWN,
+    STR_SHORTCUT_INCREASE_X_COORD,
+    STR_SHORTCUT_DECREASE_X_COORD,
+    STR_SHORTCUT_INCREASE_Y_COORD,
+    STR_SHORTCUT_DECREASE_Y_COORD,
+    STR_SHORTCUT_INCREASE_ELEM_HEIGHT,
+    STR_SHORTCUT_DECREASE_ELEM_HEIGHT,
 };
 // clang-format on
 
@@ -238,9 +252,9 @@ static void window_shortcut_scrollgetsize(rct_window* w, int32_t scrollIndex, in
  *
  *  rct2: 0x006E3A3E
  */
-static void window_shortcut_scrollmousedown(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_shortcut_scrollmousedown(rct_window* w, int32_t scrollIndex, const ScreenCoordsXY& screenCoords)
 {
-    int32_t selected_item = (y - 1) / SCROLLABLE_ROW_HEIGHT;
+    int32_t selected_item = (screenCoords.y - 1) / SCROLLABLE_ROW_HEIGHT;
     if (selected_item >= w->no_list_items)
         return;
 
@@ -251,9 +265,9 @@ static void window_shortcut_scrollmousedown(rct_window* w, int32_t scrollIndex, 
  *
  *  rct2: 0x006E3A16
  */
-static void window_shortcut_scrollmouseover(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_shortcut_scrollmouseover(rct_window* w, int32_t scrollIndex, const ScreenCoordsXY& screenCoords)
 {
-    int32_t selected_item = (y - 1) / SCROLLABLE_ROW_HEIGHT;
+    int32_t selected_item = (screenCoords.y - 1) / SCROLLABLE_ROW_HEIGHT;
     if (selected_item >= w->no_list_items)
         return;
 
