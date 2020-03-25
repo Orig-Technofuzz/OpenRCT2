@@ -1326,6 +1326,25 @@ static int32_t cc_save_park([[maybe_unused]] InteractiveConsole& console, [[mayb
     }
     return 1;
 }
+//this is added code by technofuzz to load a park via an SV6
+static int32_t cc_load_park([[maybe_unused]] InteractiveConsole& console, [[maybe_unused]] const arguments_t& argv)
+{
+    if (argv.empty())
+    {
+        console.WriteFormatLine("Please input file path");
+        return 0;
+    }
+    else
+    {
+        try{
+            load_from_sv6(argv[0].c_str());
+        }catch(...){
+            console.WriteFormatLine("File does not exist! Bad Path!");
+        }
+    }
+    return 1;
+}
+
 
 static int32_t cc_say(InteractiveConsole& console, const arguments_t& argv)
 {
@@ -1685,6 +1704,7 @@ static constexpr const console_command console_command_table[] = {
     { "remove_floating_objects", cc_remove_floating_objects, "Removes floating objects", "remove_floating_objects"},
     { "rides", cc_rides, "Ride management.", "rides <subcommand>" },
     { "save_park", cc_save_park, "Save current state of park. If no name specified default path will be used.", "save_park [name]" },
+    { "load_park", cc_load_park, "Load existing park. If no path specified, error will occur.", "save_park [path]" },
     { "say", cc_say, "Say to other players.", "say <message>" },
     { "set", cc_set, "Sets the variable to the specified value.", "set <variable> <value>" },
     { "show_limits", cc_show_limits, "Shows the map data counts and limits.", "show_limits" },
